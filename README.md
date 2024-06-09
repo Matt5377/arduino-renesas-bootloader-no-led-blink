@@ -14,4 +14,7 @@ TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.minima
 
 #For UNO R4 WiFi
 TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.wifi
+
+#For Portenta C33
+TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.c33
 ```
