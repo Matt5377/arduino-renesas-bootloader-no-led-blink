@@ -11,7 +11,7 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in
+ * The above copyright notice and this permission notice shall be included ins
  * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
@@ -31,7 +31,6 @@
 #include "bsp/board_api.h"
 #include "tusb.h"
 #include "bsp_api.h"
-#include "r_gpt.h"
 
 #include "flash.h"
 
@@ -66,20 +65,8 @@ const flash_instance_t g_flash ={ .p_ctrl = &g_flash_ctrl, .p_cfg = &g_flash_cfg
 // MACRO CONSTANT TYPEDEF PROTYPES
 //--------------------------------------------------------------------+
 
-/* Blink pattern
- * - 250 ms  : device not mounted
- * - 1000 ms : device mounted
- * - 2500 ms : device is suspended
- */
-enum  {
-  BLINK_NOT_MOUNTED = 250,
-  BLINK_MOUNTED = 1000,
-  BLINK_SUSPENDED = 2500,
-};
 
-static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
-void led_blinking_task(void);
 void set_double_tap_data(uint32_t data);
 
 void boot5(uint32_t address) {
@@ -121,40 +108,12 @@ void boot5(uint32_t address) {
 
 #define USEC_PER_SEC	(1000000U)
 #define PERIOD 			(USEC_PER_SEC / 50U)
-#define FADESTEP		2000
 
-const gpt_extended_cfg_t g_timer_extend = {
-  .gtioca = { .output_enabled = LED_FADE_PWM_OUT_A ? true : false, .stop_level = GPT_PIN_LEVEL_LOW },
-  .gtiocb = { .output_enabled = LED_FADE_PWM_OUT_B ? true : false, .stop_level = GPT_PIN_LEVEL_LOW },
-};
-
-
-const timer_cfg_t pwm_cfg = {
-    .mode = TIMER_MODE_PWM,
-    .period_counts = (uint32_t) 0x9896, .duty_cycle_counts = 0x4c4b,
-    .source_div =	(timer_source_div_t) LED_TIMER_SOURCE_DIV, .channel = LED_FADE_PWM_CHANNEL, .p_callback = NULL,
-    .p_context = NULL, .p_extend = &g_timer_extend, .cycle_end_ipl = (BSP_IRQ_DISABLED),
-};
-
-
-static gpt_instance_ctrl_t pwm_ctrl;
 #include "r_ioport.h"
 
-static const ioport_pin_cfg_t extra_pin_cfg[] = {
-#ifdef BOSSA_LOADER
-  { .pin = BSP_IO_PORT_01_PIN_09, .pin_cfg = (IOPORT_CFG_PERIPHERAL_PIN  | IOPORT_CFG_PULLUP_ENABLE | IOPORT_PERIPHERAL_SCI1_3_5_7_9) },
-  { .pin = BSP_IO_PORT_01_PIN_10, .pin_cfg = (IOPORT_CFG_PERIPHERAL_PIN  | IOPORT_CFG_PULLUP_ENABLE | IOPORT_PERIPHERAL_SCI1_3_5_7_9) },
-#endif
-  { .pin = LED_FADE_GPIO, .pin_cfg = IOPORT_CFG_PERIPHERAL_PIN | IOPORT_PERIPHERAL_GPT1 }
-};
 
-static const ioport_cfg_t pin_cfg = {
-    .number_of_pins = sizeof(extra_pin_cfg) / sizeof(ioport_pin_cfg_t),
-    .p_pin_cfg_data = extra_pin_cfg,
-};
 ioport_instance_ctrl_t port_ctrl;
 
-int pwm_channel = LED_FADE_PWM_OUT_A ? GPT_IO_PIN_GTIOCA : GPT_IO_PIN_GTIOCB;
 
 __WEAK void run_bootloader() {
   // init device stack on configured roothub port
@@ -166,7 +125,6 @@ __WEAK void run_bootloader() {
   while (1)
   {
     tud_task(); // tinyusb device task
-    led_blinking_task();
   }
 } 
 
@@ -203,13 +161,6 @@ int main(void)
 
 bootloader:
 
-  R_IOPORT_Open(&port_ctrl, &pin_cfg);
-
-  R_GPT_Open(&pwm_ctrl, &pwm_cfg);
-  R_GPT_PeriodSet(&pwm_ctrl, PERIOD);
-  R_GPT_DutyCycleSet(&pwm_ctrl, 0, pwm_channel);
-  R_GPT_Start(&pwm_ctrl);
-
 #if BSP_FEATURE_FLASH_HP_VERSION
   R_FLASH_HP_Open(g_flash.p_ctrl, g_flash.p_cfg);
   R_FLASH_HP_Reset(g_flash.p_ctrl);
@@ -231,17 +182,6 @@ bootloader:
 // Device callbacks
 //--------------------------------------------------------------------+
 
-// Invoked when device is mounted
-void tud_mount_cb(void)
-{
-  blink_interval_ms = BLINK_MOUNTED;
-}
-
-// Invoked when device is unmounted
-void tud_umount_cb(void)
-{
-  blink_interval_ms = BLINK_NOT_MOUNTED;
-}
 
 // Invoked when usb bus is suspended
 // remote_wakeup_en : if host allow us  to perform remote wakeup
@@ -249,13 +189,6 @@ void tud_umount_cb(void)
 void tud_suspend_cb(bool remote_wakeup_en)
 {
   (void) remote_wakeup_en;
-  blink_interval_ms = BLINK_SUSPENDED;
-}
-
-// Invoked when usb bus is resumed
-void tud_resume_cb(void)
-{
-  blink_interval_ms = BLINK_MOUNTED;
 }
 
 //--------------------------------------------------------------------+
@@ -391,44 +324,6 @@ void tud_dfu_detach_cb(void)
 
 #endif
 
-//--------------------------------------------------------------------+
-// BLINKING TASK + Indicator pulse
-//--------------------------------------------------------------------+
-
-void pulse_led()
-{
-	static uint32_t pulse_width;
-	static uint8_t dir;
-
-  R_GPT_DutyCycleSet(&pwm_ctrl, pulse_width, pwm_channel);
-
-	if (dir) {
-		if (pulse_width < FADESTEP) {
-			dir = 0U;
-			pulse_width = FADESTEP;
-		} else {
-			pulse_width -= FADESTEP;
-		}
-	} else {
-		pulse_width += FADESTEP;
-
-		if (pulse_width >= PERIOD) {
-			dir = 1U;
-			pulse_width = PERIOD;
-		}
-	}
-}
-
-void led_blinking_task(void)
-{
-  static uint32_t start_ms = 0;
-
-  // Blink every interval ms
-  if ( board_millis() - start_ms < 100) return;
-  start_ms += 100;
-
-  pulse_led();
-}
 
 //--------------------------------------------------------------------+
 // Double tap magic
