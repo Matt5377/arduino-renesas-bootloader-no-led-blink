@@ -192,7 +192,6 @@ uint8_t data_buffer[8192];
 uint8_t flash_buffer[4096];
 uint32_t copyOffset = 0;
 
-void pulse_led();
 
 void bossa_task() {
 
@@ -322,7 +321,6 @@ void restore_usb_switch() {
   }
 }
 
-void led_blinking_task();
 
 void run_bootloader() {
   restore_usb_switch();
@@ -332,7 +330,6 @@ void run_bootloader() {
 
   while (1) {
     bossa_task();
-    led_blinking_task();
   }
 }
 
