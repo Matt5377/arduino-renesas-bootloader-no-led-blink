@@ -2,6 +2,9 @@ A fork of the original Arduino Renesas bootloader for UNO R4 and Portenta C33 th
 
 ⚙️ `Compilation`
 ====================================
+
+Make sure you have the ``gcc-arm-none-eabi`` package installed.
+
 ```bash
 git clone https://github.com/Matt5377/arduino-renesas-bootloader-no-led-blink
 git clone https://github.com/hathach/tinyusb
@@ -12,11 +15,11 @@ cd ..
 cd arduino-renesas-bootloader-no-led-blink
 
 #For UNO R4 Minima
-TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.minima 
+#TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.minima 
 
 #For UNO R4 WiFi
-TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.wifi
+#TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.wifi
 
 #For Portenta C33
-TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.c33
+#TINYUSB_ROOT=$PWD/../tinyusb make -f Makefile.c33
 ```
